@@ -1,0 +1,50 @@
+\documentclass[11pt, a4paper, USenglish]{article} % change ``USenglish'' to ``norsk'' if applicable.
+
+\usepackage{kyblab} % Contains all included packages. See kyblab.sty.
+\usepackage{color}
+\addbibresource{bibliography.bib} % Makes the bibliography file available to biblatex.
+
+\begin{document}
+
+% Titlepage
+\title{TTK4135 Helicopter labreport}
+\author{Group 41\\Student number: 756411\\Student number: 756382}
+\date{\today}
+\begin{titlepage}
+    \maketitle
+    \begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/itk_ntnu}\\
+    Department of Engineering Cybernetics
+    \end{figure}
+    \thispagestyle{empty}
+\end{titlepage}
+
+% Abstract
+\newpage
+\input{abstract}
+\thispagestyle{empty} % Avoid page numbering on the abstract page.
+
+% TOC
+\newpage
+\tableofcontents
+\thispagestyle{empty} % Avoid page numbering on the table of contents.
+
+% Main content
+\newpage
+\setcounter{page}{1}
+\include{intro}
+\include{ex1}
+\include{ex2}
+\include{ex3}
+\include{ex4}
+\include{appendix}
+%\include{code}
+
+% References
+\newpage
+\addcontentsline{toc}{section}{References}
+\printbibliography{}
+\label{sec:bibliography}
+
+\end{document}

@@ -1,0 +1,51 @@
+\section{Optimal Control of Pitch/Travel with Feedback (LQ)}\label{sec:ex3}
+
+\subsection{Introducing Feedback}
+We wish to introduce feedback into our optimal controller. By solving the finite-horizon optimization problem presented in \cref{sec:ex2} we get an optimal input sequence, $u^*$, and an optimal trajectory, $x^*$. We incorporate feedback by introducing the manipulated variable in \cref{eq:u_k}. With this choice of feedback the optimal input, $u_k^*$ will be implemented as long as the helicopter follows the optimal trajectory, $x_k^*$, if not the feedback-term will kick into action. We need to decide on a suitable choice of the feedback matrix, K, and we chose to implement it as a LQ controller that minimizes the optimization problem in \cref{eq:FB_QP}. $Q_{fb} = I$ and $R_{fb} = 1$ serve the purpose of weighting matrices that state how much we penalize deviations in state, and how much we penalize use of the manipulated variable respectively. As with the objective function weighting matrices we will refer to the LQR feedback matrices as $Q_{fb}$ and $R_{fb}$ in the report, while in the code they are the variables $Q2$ and $R$.
+
+\begin{equation}\label{eq:u_k}
+    u_k = u_k^* - K^{\top}(x_k - x_k^*)
+\end{equation}
+
+\begin{subequations}\label{eq:FB_QP}
+\begin{align}
+    J &= \sum_{i=0}^\infty \Delta x_{i+1}^{\top}Q_{fb}\Delta x_{i+1} + \Delta u_i^{\top} R_{fb} \Delta u_i \\
+    \text{for a linear model}\nonumber \\ 
+    &x_{i+1} = Ax_i + Bu_i \\
+    \text{where}\nonumber \\ 
+    &\Delta x = x - x^* \\
+    &\Delta u = u - u^*
+\end{align}
+\end{subequations}
+
+To find our matrix $K$ we used the function "\texttt{dlqr}" in MATLAB. Our code implementation to find this feedback gain matrix can be seen in \cref{sec:p3} at the bottom under the part called \texttt{\%Feedback Optimization}.
+
+
+\subsection{Implementing Feedback in Simulink}
+With our gain matrix, $K$, in place we can implement the feedback into our Simulink model as seen in \cref{fig:sim_ex3} in \cref{sec:simulink}. Note that the feedback itself is implemented in the subsystem "\texttt{Trajectory correction}", the details of which is shown in \cref{fig:sim_ex3_fb} in \cref{sec:simulink}.
+
+The "\texttt{Trajectory correction}"-subsystem encapsulates the LQ feedback correction. Here we take in the optimal input and trajectory, $u^*$ and $x^*$, from the MATLAB workspace and produce a corrected input satisfying \cref{eq:u_k} that we use as the set-point, $p_c$, for our pitch controller.
+
+The results from this feedback introduction is seen in figures (\ref{fig:3_r=0.1}-\ref{fig:3_r=10}). If we focus on the subplots showing the optimal $\lambda^*$ against the measured $\lambda$ we see a great improvement in tracking compared to the open-loop scenario in \cref{sec:ex2}. As such we can conclude that the introduction of feedback improved our tracking of optimal trajectory considerably. The lowest value for $R_{fb}$ seems to provide the best  over all tracking.
+
+Note that more time could be spent adjusting the weighting matrices $Q_{fb}$ and $R_{fb}$ in our feedback, and that would lead to an even better tracking. We were satisfied with our results and didn't spend more time tuning the feedback in this part of the assignment. 
+
+\subsection{Alternatives to LQ feedback}
+An alternative to using an LQ controller to provide feedback is to use model predictive control (MPC) instead. An MPC controller start by solving a finite-horizon quadratic optimization problem, but instead of implementing the whole optimal input sequence you only implement the first, wait for a measurement, and then reoptimize your QP with the masurment as a new inital state, implement the new first input, and so on.
+
+By only implementing one input and waiting for a new measurement before the next input is computed we introduce feedback in this control scheme. This means that MPC has built-in feedback and can as such replace both our optimization algorithm and our LQ feedback. To realize MPC with our current setup we would need to get the measurments from QuaRC via Simulink to our MATLAB script at every iteration, this can be accomplished by incorporating our script in the Simulink model as a function block. The optimization function then needs to only provide one input step instead of the whole sequence and wait until it is handed a new state-measurement.
+
+One advantage of MPC is that it couples open loop optimization with feedback so that we do not need to rely on external feedback to correct the deviation of actual state vs. optimal trajectory. This is useful since we can optimize from whatever state the plant is currently in, or estimated to be in, and then optimize from that state towards the desired state.
+
+A disadvantage with MPC is the increased computational complexity as an open loop optimization problem needs to be solved at every time-step. This requires either more efficient algorithms or more computing power, or if this is not available either a lower sample rate for the control loop or a shorter time-horizon to optimize.
+
+By implementing an MPC controller, we would in practice merge the optimization layer and the advanced control layer in figure 8 in the assignment text, as the measured state $x$ would be fed back into the optimization layer aswell.
+
+
+
+
+
+
+
+
+

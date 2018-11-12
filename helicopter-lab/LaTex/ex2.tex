@@ -1,0 +1,206 @@
+\section{Optimal control of Pitch/Travel without feedback}\label{sec:ex2}
+In this part of the exercise we will disregard elevation, that is, we assume $e = 0$ at every time-step. We will then calculate an optimal trajectory $x^*$ and a corresponding optimal input sequence $u^*$. This input sequence will be implemented as setpoints for the inner controllers, but we will not feed back the measured state to correct for deviations from the optimal trajectory.
+
+\subsection{Continuous State-space form of dynamics}\label{sec:SS_cont}
+The closed loop inner dynamics for our helicopter with a PID elevation controller and a PD pitch controller can be seen in \cref{eq:dynamics}, these equations were given in the assignment.
+
+\begin{subequations}\label{eq:dynamics}
+\begin{align}
+    \ddot{e} + K_3K_{ed}\dot{e} + K_3K_{ep}e &= K_3K_{ep}e_c \\
+    \ddot{p} + K_1K_{pd}\dot{p} + K_1K_{pp}p &= K_1K_{pp}p_c \\
+    \dot{\lambda} &= r \\
+    \dot{r} &= -K_2p 
+\end{align}
+\end{subequations}
+
+First, we wish to put the system on continuous state-space form as in \cref{eq:SS_eq}, with state and unit vector as given in \cref{eq:unit_vector}. The resulting system matrices are shown in \cref{eq:SS_cont}. 
+
+\begin{equation}\label{eq:SS_eq}
+    \dot{x} = A_cx + B_cu
+\end{equation}
+
+\begin{equation}\label{eq:unit_vector}
+    \begin{aligned}
+        x =
+        \begin{bmatrix} \lambda \\ r \\ p \\ \dot{p} \end{bmatrix},
+        \quad
+        u = p_c
+    \end{aligned}
+\end{equation}
+
+\begin{equation}\label{eq:SS_cont}
+    \begin{aligned}
+        \mathbf{A_c} =
+        \begin{bmatrix} 0 & 1 & 0 & 0 \\ 0 & 0 & -K_2 & 0 \\ 0 & 0 & 0 & 1 \\ 0 & 0 & -K_1K_{pp} & -K_1K_{pd} \end{bmatrix}, \quad
+        \mathbf{B_c} = 
+        \begin{bmatrix} 0 \\ 0 \\ 0 \\ K_1K_{pp} \end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+The model in \cref{eq:SS_cont} represents the closed-loop dynamics of our plant, the helicopter, as well as the basic control layer with the pitch- and elevation-controllers.
+
+\subsection{Discretizing the model}\label{sec:discSS}
+We wish to discretize the model found in \cref{eq:SS_cont} using the forward Euler method to get the discrete-time state-space model as seen in \cref{eq:SS_disc_eq}. The method of discretization can be seen in \cref{eq:forwardEuler}. Combining this with \cref{eq:SS_eq} gives us \cref{eq:disc_algorithm}, where $A$ and $B$ are the discrete-time system matrices. The discrete time system matrices are shown in \cref{eq:SS_disc}
+
+\begin{equation}\label{eq:SS_disc_eq}
+    x_{k+1} = Ax_k + Bu_k
+\end{equation}
+
+
+\begin{equation}\label{eq:forwardEuler}
+    \dot{x} \approx \frac{x_{k+1}-x_k}{T_s}
+\end{equation}
+
+\begin{equation}\label{eq:disc_algorithm}
+    x_{k+1} = (T_sA_c + I)x_k + (B_cT_s)x_k = Ax_k + Bu_k
+\end{equation}
+
+\begin{equation}\label{eq:SS_disc}
+    \begin{aligned}
+        \mathbf{A} =
+        \begin{bmatrix} 1 & T_s & 0 & 0 \\ 0 & 1 & -T_sK_2 & 0 \\ 0 & 0 & 1 & T_s \\ 0 & 0 & -T_sK_1K_{pp} & 1 -T_sK_1K_{pd} \end{bmatrix}, \quad
+        \mathbf{B} = 
+        \begin{bmatrix} 0 \\ 0 \\ 0 \\ T_sK_1K_{pp} \end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+\subsection{Calculating optimal trajectory}
+\subsubsection{Method}
+In this section we want to find and optimal trajectory that moves the helicopter from $x_0$ to $x_f$, shown in \cref{eq:start_stop_vectors}, and with $\lambda_0=\pi$ and $\lambda_f=0$. We assume the elevation angle to be constant in this assignment, and that we can control it independently of pitch with the elevation controller in the basic control layer. To limit the pitch angle we put a constraint on the pitch state at every time-step, $k$, as seen in \cref{eq:pitch_constraint}.
+
+\begin{equation}\label{eq:start_stop_vectors}
+    \begin{aligned}
+        x_0 =
+        \begin{bmatrix} \lambda_0 \\ 0 \\ 0 \\ 0 \end{bmatrix},
+        \quad
+        x_f =
+        \begin{bmatrix} \lambda_f \\ 0 \\ 0 \\ 0 \end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+\begin{equation}\label{eq:pitch_constraint}
+    |p_k| \leq \frac{30\pi}{180},\quad k\in\{1,...,N\}
+\end{equation}
+
+The way we construct our optimal trajectory is to formulate our problem as a finite-horizon optimization problem. The objective function of this problem can be expressed as \cref{eq:finite_horizon}. Where we use a time-step of $T_s = 0.25s$ and a horizon of $N=100$.
+
+\begin{equation}\label{eq:finite_horizon}
+    \phi = \sum_{i=1}^{N} (\lambda_i - \lambda_f)^2 + qp_ci^2
+\end{equation}
+
+Now we have what we need to construct a QP optimization problem that will allow our helicopter to move along a desired trajectory. \Cref{eq:QP_ex2} is adapted from "Merging Optimization and Control"\cite{MergingOptCtr}, and fits our purpose nicely. However we see that the objective function in \cref{eq:obj} and \cref{eq:finite_horizon} are different so we need to transform \cref{eq:finite_horizon} to an objective that encompas all states not just $\lambda$. Note, that our original objective does not have a linear term, $c_t$, so all we need is to find a suitable $Q_t$ and $R_t$. Our transformed $Q$ and $R$ are also time-invariant, and shown in \cref{eq:QP_transform}.
+
+We also see that the QP expects some constraints on states in \cref{eq:QP_stateConstraint} that we do not have in our original problem. This is easily solved by setting the constraints the otherwise unconstrained states to $\pm\infty$.
+
+Lastly we need to incorporate the dynamics of our helicopter into the optimization problem, and this is easily done by letting \cref{eq:QP_modelConstraints} equal the discrete-time state-space equations found in \cref{sec:discSS}.
+
+We see that our problem is convex since the objective is convex, as long as $\mathbf{R}\succeq0$, and the constraints are all linear. Since this is a convex problem it can be solved with any of the algorithms presented in "Numerical Optimization"\cite{optNW} such as interior-point method or active set method.
+
+\begin{subequations}\label{eq:QP_ex2}
+\begin{align}
+    \min_{z\in\mathbb{R}^n} \phi(z) &= \sum_{i=0}^N \frac{1}{2}x_{t+1}^{\top}Q_{t+1}x_{t+1} + c_{t+1}x_{t+1} + \frac{1}{2}u_t^{\top} R_tu_t\label{eq:obj}\\
+    \text{subject to}\nonumber \\ 
+    &x_{t+1} = Ax_t + Bu_t\label{eq:QP_modelConstraints} \\
+    &x^{low} \leq x_t \leq x^{high}\label{eq:QP_stateConstraint} \\
+    &u^{low} \leq u_t \leq u^{high}\\
+    \text{where}\nonumber \\ 
+    &z = (x_1^\top,...,x_N^\top,u_0^\top,...,u_{N-1}^\top)^\top\\
+    &n = N(n_x +n_u)
+\end{align}
+\end{subequations}
+
+\begin{equation}\label{eq:QP_transform}
+    \begin{aligned}
+        \mathbf{Q} =
+        \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0  \end{bmatrix}, \quad
+        \mathbf{R} = q
+    \end{aligned}
+\end{equation}
+
+We wish to solve our QP, \cref{eq:QP_ex2}, using MATLAB and the built-in function "\texttt{quadprog}". In order to do that we need to transform our QP to standard form. This involves altering the objective function to be on the form of \cref{eq:expanded_obj}, where $G$ is a block diagonal matrix.
+
+\begin{subequations}\label{eq:expanded_obj}
+\begin{align}
+    \min_{z\in\mathbb{R}^n} \phi(z) &= \frac{1}{2} z^{\top}Gz\\
+    \text{where}\nonumber \\
+    G &= \begin{bmatrix}
+       Q_1 & 0 & \cdots & \cdots & \cdots & 0 \\
+       0   & \ddots & \ddots & & & \vdots \\
+       \vdots   & \ddots & Q_N & \ddots & & \vdots \\
+       \vdots  & & \ddots & R_0 & \ddots &  \vdots \\
+       \vdots  & & & \ddots & \ddots  &  0 \\
+       0  & \cdots & \cdots & \cdots & 0  &  R_{N-1} \\
+    \end{bmatrix}
+\end{align}
+\end{subequations}
+
+We can also extend our linear model constraints by realizing that every state in \cref{eq:QP_modelConstraints} depends upon the previous state, to give us equality constraints with dimension $z$. The derivation of this method is explained in\cite{MergingOptCtr}, and the result is summarized in \cref{eq:expanded_linConstr}. Extending the state and input constraints to hold for $z$ instead of $x_t$ and $u_t$ is quite trivial.
+
+\begin{equation}\label{eq:expanded_linConstr}
+    \underbrace{\begin{bmatrix}
+        I & 0 & \cdots & 0 & -B & 0 & 0 & 0 \\
+        -A & \ddots & 0 & 0 & 0 & \ddots & 0 & 0 \\
+        0 & \ddots & \ddots & 0 & 0 & 0 & \ddots & 0 \\
+        0 & 0 & -A & I & 0 & 0 & 0 & -B
+    \end{bmatrix}}_{A_{eq}}
+    \underbrace{\begin{bmatrix}
+        x_1 \\
+        \vdots \\
+        x_N \\
+        u_0 \\
+        \vdots \\
+        u_N
+    \end{bmatrix}}_z
+    = 
+    \underbrace{\begin{bmatrix}
+        Ax_0 \\
+        0 \\
+        \vdots \\
+        0
+    \end{bmatrix}}_{B_{eq}}
+\end{equation}
+
+\subsubsection{Implementation in MATLAB}
+Our realization of the optimization problem in the above section can be found in the appendix, \cref{sec:p2}. Note that we use a couple functions that are not included in this report, they are: \texttt{gen\_constraints}, \texttt{gen\_q} and \texttt{gen\_aeq}. They were handed out along with the project. They simply aid in converting the QP from the form \cref{eq:QP_ex2} to eq. (\ref{eq:expanded_obj}-\ref{eq:expanded_linConstr}).
+
+When the problem is on our desired form we use the MATLAB-function \texttt{quadprog} to minimize our objective function, subject to its constraints and generate an optimal input $u^*$. The MATLAB code used to solve this problem is found in \cref{sec:p2}.
+
+\subsubsection{Evaluation of results}
+Here we will investigate the impact of changing $q$ in \cref{eq:obj}. Changing q corresponds to changing $R$ in \cref{eq:QP_transform}, which again equals altering \texttt{P1} in the code in \cref{sec:p2}. The difference in optimal trajectory on all four states, $x$, as well as the setpoint for our pitch-controller, $u=p_c$, can be seen as the magenta curve in \cref{fig:2_p1=0.1}, \cref{fig:2_p1=1} and \cref{fig:2_p1=10} in \cref{sec:plots}. Henceworth, the plots and code will match in variable name, while our equations coincide with the assignment text. 
+
+The parameter $q$ can be considered a cost on our optimization output, $p_{ci}$. At every time step we wish to use as little $p_{ci}$ as possible, while still arriving at the desired $\lambda_f$ as soon as possible. We can think of an increase in $q$ as a stricter restriction on the pitch angle the helicopter can maintain over time. This is seen in the subplots of $u$, as $q$ increases the time that $p_c$ is equal its constraint, \cref{eq:pitch_constraint}, decreases.
+
+Also note that increasing $q$ makes the difference between $\lambda_i$ and $\lambda_f$ less relevant. With a high $q$, there is less importance on reaching the desired destination quickly, as the solution to the optimization problem will be to keep $p_{ci}$ lower at the cost of maintaining a larger difference between desired and actual travel for a longer time.
+
+Note that there are some problems with our objective function \cref{eq:obj}, particularly the term $\lambda_i - \lambda_f$. Imagine a scenario where the helicopter approaches the desired point $\lambda_f$ with a fast travel rate. At the instant it reaches the desired point, the optimal input would be to set the pitch angle to zero according to the objective function. This causes the helicopter to glide past the desired end-point and counter measures must be made to return to the right $\lambda_f$. This could cause the helicopter to oscilate around the desired destination.
+
+\subsection{Implementing the optimal control sequence in Simulink}
+\subsubsection{Implementation}
+The optimal trajectory found in the section above is to be implemented as a sequence of set-points to our pitch-controller. The aim here is to get the physical plant to behave as expected, namely that the helicopter flies half a rotation around its $\lambda$-axis at neutral elevation.
+
+However, the sensors on our helicopter are relative, and initialized at zero-values every time the helicopter is run. Meaning that the physical helicopter-setup plant has a zero elevation angle when it is resting on the table, while our model has a zero elevation angle when the helicopter is paralell to the surface. Our model also operate under the assumption that our initial travel is half a rotation, $\lambda_0=\pi$, while the sensor-value is zero. We solve this mismatch by adding a $-30\degree$ offset on elevation-angle, and a $180\degree$ offset on travel-angle in our Simulink model.
+
+The optimal trajectory is only valid for $N\cdot T_s=25s$ and expects the helicopter to be at its initial position of $x_0$ when the sequence starts. To get the helicopter to the desired starting point we pad the input-sequence with five seconds worth of $x_0$ states at the start, and to avoid it dropping to the ground after the optimal sequence is finished we pad with five seconds of $x_f$ states at the end. This optimal input vector is then imported into Simulink with the "\texttt{From Workspace}"-block and used as the set-point, $p_c$, for our pitch controller. The resulting Simulink model can be found in \cref{fig:sim_ex2}.
+
+\subsubsection{Results}
+We collected data from three different executions of the optimal control sequence, each with different values for $q$. These measurements are plotted together with their corresponding optimal control sequence in the figures (\ref{fig:2_p1=0.1}-\ref{fig:2_p1=10}) in \cref{sec:plots}.
+
+Note that the tracking between the predicted state from the optimization problem and measured state are relatively good for the states $p$ and $\dot{p}$ no matter the value for $q$. However for the state we try to control and its derivative, $\lambda$ and $r$, the situation is much worse. We are never able to reach our desired end-state $x_f$.
+
+The optimal control sequence implemented above is an open-loop dynamic optimization, meaning that any modeling error, no matter how small will lead to deviations from from the optimal trajectory, as we have observed. It's apparent that there's more inertia in the physical system than in the model. The pitch required to move the helicopter $180\degree$ is underestimated in the calculated trajectory compared to the actual plant, and the pitch required to stop it at $x_f$ is put in prematurely. This makes the helicopter change travel direction before it reaches it's destination and it drifts back towards and past the position. The lack of feedback in our method means that we are not able to correct for these model errors. We will see how we can compensate for this by introducing feedback in \cref{sec:ex3}.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

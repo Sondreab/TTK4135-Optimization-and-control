@@ -1,0 +1,161 @@
+\section{Optimal Control of Pitch/Travel and Elevation with
+and without Feedback}\label{sec:ex4}
+Now, the task is to calculate an optimal trajectory in two dimensions. The
+helicopter is moved from $x_0$ to $x_f$ past an imaginary obstacle causing the elevation angle to change during the flight. We must therefore add the elevation to the state vector; the setpoint $e_c$ is a new manipulated variable in the system.
+
+\subsection{Extending the model}\label{sec:ex4.1}
+
+So we add the dynamics for the elevation from \cref{eq:dynamics} to the continous system in \cref{eq:SS_eq}-(\ref{eq:SS_cont}) in \cref{sec:ex1}.
+this gives us a new state-vector $x$, input $u$, and system matrices as shown in \cref{eq:unit_vector_ext}-(\ref{eq:SS_cont_ext}).
+
+\begin{equation}\label{eq:unit_vector_ext}
+    \begin{aligned}
+        x =
+        \begin{bmatrix} \lambda \\ r \\ p \\ \dot{p} \\ e \\ \dot{e}\end{bmatrix},
+        \quad
+        u = 
+        \begin{bmatrix} p_c \\ e_c\end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+\begin{equation}\label{eq:SS_cont_ext}
+    \begin{aligned}
+        &\mathbf{A_c} =
+        \begin{bmatrix} 
+          0 & 1 &     0      &     0      &     0      &     0 \\
+          0 & 0 &   -K_2     &     0      &     0      &     0 \\ 
+          0 & 0 &     0      &     1      &     0      &     0 \\ 
+          0 & 0 & -K_1K_{pp} & -K_1K_{pd} &     0      &     0 \\
+          0 & 0 &     0      &     0      &     0      &     1 \\
+          0 & 0 &     0      &     0      & -K_3K_{ep} & -K_3K_{ed}
+          \end{bmatrix}, \\
+        &\mathbf{B_c} = 
+        \begin{bmatrix}
+           0      &    0 \\
+           0      &    0 \\
+           0      &    0 \\ 
+        K_1K_{pp} &    0 \\
+           0      &    0 \\
+           0      & K_3K_{ep}
+        \end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+\subsection{Discretizing the extended model}\label{sec:ex4.2}
+
+Utilizing the forward Euler method (\cref{eq:forwardEuler}-(\ref{eq:disc_algorithm})) we arrive at the discretized system in \cref{eq:SS_disc_ext}
+
+\begin{equation}\label{eq:SS_disc_ext}
+    \begin{aligned}
+        &\mathbf{A} =
+        \begin{bmatrix} 
+          1 & T_s &       0       &      0         &       0       &     0 \\
+          0 &  1  &   -T_sK_2     &      0         &       0       &     0 \\ 
+          0 &  0  &       1       &     T_s        &       0       &     0 \\ 
+          0 &  0  & -T_sK_1K_{pp} & 1-T_sK_1K_{pd} &       0       &     0 \\
+          0 &  0  &       0       &      0         &       1       &    T_s \\
+          0 &  0  &       0       &      0         & -T_sK_3K_{ep} & 1-T_sK_3K_{ed}
+          \end{bmatrix}, \\
+        &\mathbf{B} = 
+        \begin{bmatrix}
+             0       &     0 \\
+             0       &     0 \\
+             0       &     0 \\ 
+        T_sK_1K_{pp} &     0 \\
+             0       &     0 \\
+             0       & T_sK_3K_{ep}
+        \end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+\subsection{Extending the optimization problem}
+\subsubsection{Implementing the obstacle}
+
+Next we introduce the obstacle into the problem, which is modelled by a nonlinear inequality constraint given by \cref{eq:non_lin_con}
+
+
+\begin{equation}\label{eq:non_lin_con}
+    c_{obstacle}(x_k) = \alpha \textrm{exp}(-\beta (\lambda_k - \lambda_t)^2) - e_k \leq 0, \quad \forall k \in \{1,...,N\}.
+\end{equation}
+
+\begin{equation*}
+    \text{where} \quad \alpha = 0.2, \quad \beta = 20, \quad \lambda_t = \frac{2pi}{3}.\nonumber
+\end{equation*}
+
+The MATLAB code for generating this constraint can be found in \cref{sec:nonlcon}.
+
+
+\subsubsection{Updating the optimization problem}\label{sec:ex4.3}
+
+As we have added states and inputs to the model we need to reflect those changes in the objective function.
+
+The optimization problem in \cref{eq:QP_ex2} now has the objective function stated in \cref{eq:finite_horizon_ext},
+
+\begin{equation}\label{eq:finite_horizon_ext}
+    \phi = \sum_{i=1}^{N} (\lambda_i - \lambda_f)^2 + q_1p_{ci}^2 + q_2e_{ci}^2
+\end{equation}
+
+with updated constraints to match the new system matrices and the addition of the non-linear inequality constraint $c_{obstacle}$ in \cref{eq:non_lin_con}.
+We also have a slightly different $z$ as each vector $x_i$ has 2 additional states and the elements $u_i$ are now vectors instead of scalars. Furthermore this objective function requires extended \textbf{Q} and \textbf{R} matrices as shown in \cref{eq:QP_transform_ext}.
+
+\begin{equation}\label{eq:QP_transform_ext}
+    \begin{aligned}
+        \mathbf{Q} =
+        \begin{bmatrix} 
+        1 & 0 & 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 & 0 & 0 \\ 
+        0 & 0 & 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 & 0 & 0
+        \end{bmatrix}, \quad
+        \mathbf{R} =
+        \begin{bmatrix} q_1 & 0 \\ 0 & q_2  \end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+\subsubsection{Calculating optimal trajectory}
+
+Because we now have introduced a non-linear constraint to our optimization problem, we can no longer solve it using the MATLAB function \texttt{quadprog} so we're going to use \texttt{fmincon} instead. This function expects us to parse an objective function and a function for the non-linear constraints as arguments, and the implementation can be found in \cref{sec:p4} and \ref{sec:nonlcon}. Because of the increased complexity of the problem we reduced the horizon to $N = 40$, and started with values $q_1 = q_2 = 1$.
+
+The resulting trajectory for the elevation can be found in \cref{fig:4_hill_trajec} in \cref{sec:plots}.
+
+\subsection{Implementing trajectory in the plant with and without feedback}\label{sec:ex4.4}
+
+The Simulink model used in this section can be found in \cref{fig:sim_ex4} and \cref{fig:sim_ex4_fb} in \cref{sec:simulink}.
+Running the helicopter with and without feedback using the optimal input calculated by \texttt{fmincon} gave slightly different results. The biggest differences can naturally be seen on the travel, $\lambda$, and elevation, \textit{e}. The result can be found in \cref{fig:4_untuned_pitch} and \cref{fig:4_untuned_elev} in \cref{sec:plots}.
+Both the responses are without tuning of the matrices $Q$ and $R$.
+With feedback the feedback matrices used for generating $K$ are shown in \cref{eq:untuned_fb_matrices}
+
+\begin{equation}\label{eq:untuned_fb_matrices}
+    \begin{aligned}
+        \mathbf{Q_{fb}} =
+        \begin{bmatrix} 
+        1 & 0 & 0 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 & 0 & 0 \\ 
+        0 & 0 & 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 0 & 0 & 1
+        \end{bmatrix}, \quad
+        \mathbf{R_{fb}} =
+        \begin{bmatrix} 1 & 0 \\ 0 & 1  \end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+We see from the results that without feedback we still have the problem where we never reach our desired end state $x_f$, as the helicopter misses the travel destination $\lambda_f$ completely. With feedback we are able to reach our destination but neither running the helicopter with nor without feedback gets even close of clearing the obstacle.
+
+After tuning the model with feedback we ended up with $q_1 = 2,\ q_2 = 1$, and the feedback matrices in \cref{eq:tuned_fb_matrices}.
+
+\begin{equation}\label{eq:tuned_fb_matrices}
+    \begin{aligned}
+        \mathbf{Q_{fb}} =
+        \begin{bmatrix} 
+        1 & 0 & 0 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 &  0 & 0 \\ 0 & 0 & 1 & 0 & 0 & 0 \\ 
+        0 & 0 & 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 & 20 & 0 \\ 0 & 0 & 0 & 0 & 0 & 2
+        \end{bmatrix}, \quad
+        \mathbf{R_{fb}} =
+        \begin{bmatrix} 1 & 0 \\ 0 & \frac{1}{2}  \end{bmatrix}
+    \end{aligned}
+\end{equation}
+
+This led to the result found in \cref{fig:4_tuned_pitch} and \cref{fig:4_tuned_elev} in \cref{sec:plots}. We see that the helicopter is still not able to clear the obstacle, but it comes a lot closer. Why it isn't able to fly over the obstacle is further discussed in \cref{sec:ex4.5}. 
+We started the tuning process by trying to decrease the error $e_c-e$. we raised the corresponding weight in $Q_{fb}$ to make it prioritize minimizing this error more. We kept raising it until we had a satisfyingly fast response in reaching the setpoint without oscillating too much. We were still too short of clearing the obstacle as it was too aggressive on pitch (discussed further in \cref{sec:ex4.5}) so we lowered the cost of the input $e_c$.
+
+\subsection{Discussing the decoupling of states}\label{sec:ex4.5}
+
+With the model we are using there is no connection between the four first states and the last two. This is of course a gross simplification compared to real life as it doesn't reflect that the vertical forces are diminished by having $p \neq 0$. This combined with the same effect when $e \neq 0$ is what causes the big difference in the calculated trajectory and the actual, measured trajectory for elevation. Reducing the effect of the pitch can be done by putting a more aggressive constraint on it, but this will make correction in $\lambda$ much slower. Another solution is to use a more realistic starting point for modeling the dynamics of our helicopter that has a higher degree of coupling between pitch and elevation.
+
+To push the elevation closer to clearing the obstacle we can also address the effect of the elevation angle. We assume a linear model close to the equilibrium $\lambda = p = e = 0$, which is a reasonable assumption, but the helicopter doesn't have to deviate far in the elevation angle for the dynamics to be far from linear. Again, one option is to use a more coupled model. Another solution is to extend the "arm" the helicopter is connected to, but that would cause problems with the available space of the facilities we are using. Adding a joint on the arm in attempt to hold the helicopter head level when changing the elevation angle is another solution, but that either requires a sophisticated mechanical solution or will result in the head having very low stability.

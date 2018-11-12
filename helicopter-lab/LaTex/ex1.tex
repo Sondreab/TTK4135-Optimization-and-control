@@ -1,0 +1,9 @@
+\section{Familiarizing ourselves with the starting point of the project}\label{sec:ex1}
+
+We were given an initial Simulink-model of the helicopter as well as a MATLAB script with the necessary physical parameters for our masses and lengths. The first assignment was to familiarize ourselves with the handed out code. The code consisted of some helper-functions to generate constraints, and converting matrices to QP standard form, and a figure of the handed out Simulink model can be seen in \cref{fig:sim_start} in \cref{sec:simulink}.
+
+The Simulink file consists of four blocks. The first is the helicopter interface, it enables us to get measurements from our helicopter as well as apply inputs to the helicopter motors. The next block is a conversion module that converts the sum and difference of motor voltages (our controller output) into the front and back motor voltage (what the helicopter input is). Lastly we are given two mono-variable controllers, one for pitch and one for elevation.
+
+In this project we were to treat the mono-variable pitch and elevation controllers as the basic control-layer on which to build our optimization layer. We assume the controllers to be well-tuned and well-behaved so no effort was made to further tune these controllers.
+
+After confirming that we could compile and run the handed out files, and that the helicopter responded as expected we moved on to implement optimal control without feedback
